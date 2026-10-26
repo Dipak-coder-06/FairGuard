@@ -1,0 +1,15 @@
+artifact_uri: file:c:\Users\dhira\Documents\Dipak_Project\src\..\artifacts\mlruns/408859658220309193/4a264204038a4bf1a3525e2622fb62d3/artifacts
+end_time: 1793021219063
+entry_point_name: ''
+experiment_id: '408859658220309193'
+lifecycle_stage: active
+run_id: 4a264204038a4bf1a3525e2622fb62d3
+run_name: Model_A_Unmitigated
+run_uuid: 4a264204038a4bf1a3525e2622fb62d3
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1793021219019
+status: 3
+tags: []
+user_id: dhira

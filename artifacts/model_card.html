@@ -1,0 +1,199 @@
+<html><head><meta charset='utf-8'><style>body{font-family:sans-serif;max-width:900px;margin:auto;padding:2em}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:.5em}th{background:#f0f0f0}</style></head><body><h1>FairGuard AI — Model Card</h1>
+<p><em>Generated: 2026-10-26 | Standard: Mitchell et al. (2019) Model Cards</em></p>
+<hr />
+<h2>1. Model Details</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Model A (Unmitigated)</th>
+<th>Model B (Fairness-Aware)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Type</strong></td>
+<td>HistGradientBoostingClassifier</td>
+<td>ExponentiatedGradient + LogisticRegression</td>
+</tr>
+<tr>
+<td><strong>Constraint</strong></td>
+<td>None</td>
+<td>Demographic Parity</td>
+</tr>
+<tr>
+<td><strong>Framework</strong></td>
+<td>scikit-learn</td>
+<td>Fairlearn</td>
+</tr>
+<tr>
+<td><strong>MLflow Run</strong></td>
+<td>Model_A_Unmitigated</td>
+<td>Model_B_FairnessMitigated</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>2. Intended Use</h2>
+<p><strong>Primary Use:</strong> Income bracket classification for demonstrating responsible AI evaluation techniques.</p>
+<p><strong>Out-of-scope Use:</strong> Real hiring, lending, or credit decisions without additional human review, bias auditing, and regulatory compliance checks. Model outputs MUST NOT be used to draw conclusions about protected groups.</p>
+<hr />
+<h2>3. Factors</h2>
+<p><strong>Sensitive Attributes Evaluated:</strong> <code>sex</code>, <code>race</code>, <code>age_bin</code></p>
+<p><strong>Intersectional Groups:</strong> <code>sex × race</code> combinations evaluated separately.</p>
+<hr />
+<h2>4. Performance Metrics</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Model A</th>
+<th>Model B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Accuracy</td>
+<td>0.861</td>
+<td>0.8333</td>
+</tr>
+<tr>
+<td>AUC-ROC</td>
+<td>0.9223</td>
+<td>0.7317</td>
+</tr>
+<tr>
+<td>F1 Score</td>
+<td>0.6982</td>
+<td>0.607</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>5. Evaluation Data</h2>
+<ul>
+<li><strong>Dataset:</strong> UCI Adult Census Income (fetch_openml, version 2)</li>
+<li><strong>Split:</strong> 80% train / 20% test (stratified by income)</li>
+<li><strong>Sample:</strong> Up to 20,000 rows after NaN removal</li>
+<li><strong>Features:</strong> 14 original features; age binned to <code>&lt;30 / 30-50 / &gt;50</code> for group analysis</li>
+</ul>
+<hr />
+<h2>6. Fairness &amp; Privacy Findings</h2>
+<h3>Fairness Summary</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Model A</th>
+<th>Status A</th>
+<th>Model B</th>
+<th>Status B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Demographic Parity Diff</td>
+<td>0.1851</td>
+<td>Warning</td>
+<td>0.0153</td>
+<td>Pass</td>
+</tr>
+<tr>
+<td>Equalized Odds Diff</td>
+<td>0.11</td>
+<td>Warning</td>
+<td>0.3986</td>
+<td>Fail</td>
+</tr>
+<tr>
+<td>Disparate Impact</td>
+<td>0.3299</td>
+<td>Fail</td>
+<td>0.9173</td>
+<td>Pass</td>
+</tr>
+<tr>
+<td>Error Rate Disparity</td>
+<td>0.1132</td>
+<td>Warning</td>
+<td>0.1066</td>
+<td>Warning</td>
+</tr>
+</tbody>
+</table>
+<h3>Privacy Risk (Model A)</h3>
+<table>
+<thead>
+<tr>
+<th>Indicator</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Min k-Anonymity (k)</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Rows with k &lt; 5</td>
+<td>59.15%</td>
+</tr>
+<tr>
+<td>MIA Train/Test AUC Gap</td>
+<td>0.0231</td>
+</tr>
+<tr>
+<td>Membership Inference Risk</td>
+<td><strong>Low</strong></td>
+</tr>
+</tbody>
+</table>
+<h3>Data Drift</h3>
+<table>
+<thead>
+<tr>
+<th>Indicator</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Share of Drifted Features</td>
+<td>0.14285714285714285</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>7. Fairness–Accuracy Trade-off Analysis</h2>
+<p>Model B applies the <strong>Exponential Gradient</strong> reduction with a <strong>Demographic Parity</strong> constraint, which directly optimises for equal selection rates across sensitive groups. This typically results in a measurable drop in raw accuracy and AUC compared to the unconstrained Model A, because the model is constrained away from patterns that, while predictive, correlate with protected attributes.</p>
+<p><strong>Why Demographic Parity and Equalized Odds can conflict:</strong> Demographic Parity requires equal <em>selection rates</em> (P(ŷ=1 | group)), while Equalized Odds requires equal <em>true positive rates and false positive rates</em> across groups. When the <em>base rates</em> (P(y=1 | group)) differ between groups — as they do in the UCI Adult dataset across sex and race — it is <strong>mathematically impossible</strong> to satisfy both constraints simultaneously (Chouldechova, 2017; Kleinberg et al., 2016). Enforcing one necessarily violates the other. FairGuard AI reports both metrics to expose this tension explicitly and leave the trade-off decision to human stakeholders.</p>
+<hr />
+<h2>8. Caveats</h2>
+<ul>
+<li>UCI Adult data reflects 1994 US Census income patterns; distributions may not generalise.</li>
+<li>Fairness metrics are sensitive to how groups are defined and which sensitive attribute is chosen as the primary axis.</li>
+<li>SHAP values on Model B (mitigated) may differ significantly from Model A because the underlying model family changed.</li>
+<li>k-Anonymity is a weak privacy guarantee; re-identification risk may still exist.</li>
+</ul>
+<hr />
+<h2>9. Mitigations</h2>
+<ul>
+<li><strong>Pre-processing:</strong> Fairlearn sample reweighing (if enabled).</li>
+<li><strong>In-processing:</strong> Exponential Gradient with Demographic Parity (Model B).</li>
+<li><strong>Post-processing:</strong> Threshold calibration per group (recommended next step).</li>
+<li><strong>Monitoring:</strong> Evidently AI drift reports on production data.</li>
+<li><strong>Human Oversight:</strong> Sign-off checklist enforced before deployment.</li>
+</ul>
+<hr />
+<h2>10. Sign-Off Checklist</h2>
+<ul>
+<li>[ ] Fairness audit reviewed by responsible AI lead</li>
+<li>[ ] All metrics above threshold reviewed and documented</li>
+<li>[ ] Drift report reviewed; no significant distributional shift confirmed</li>
+<li>[ ] Privacy risk assessed; k-anonymity deemed acceptable</li>
+<li>[ ] Model Card approved by data governance team</li>
+<li>[ ] Legal / regulatory review completed</li>
+<li>[ ] Deployment approved</li>
+</ul>
+<hr />
+<p><em>FairGuard AI · Responsible AI Assessment Workbench</em></p></body></html>
