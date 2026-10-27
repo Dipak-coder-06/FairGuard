@@ -24,7 +24,7 @@ INPUT_DIR = os.path.join(os.path.dirname(__file__), "input")
 os.makedirs(INPUT_DIR, exist_ok=True)
 
 CAT_COLS = ["workclass","education","marital-status","occupation",
-            "relationship","native-country","sex","race"]
+            "relationship","native-country"]
 NUM_COLS = ["age","fnlwgt","education-num","capital-gain","capital-loss","hours-per-week"]
 
 def build_prep(X):

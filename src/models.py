@@ -1,5 +1,8 @@
 import os
 import joblib
+# MLflow 3 blocks the legacy file store unless explicitly opted in. This
+# project keeps its tracking data under artifacts/mlruns for compatibility.
+os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
 import mlflow
 import numpy as np
 import pandas as pd
@@ -16,7 +19,7 @@ MLRUNS_DIR = os.path.join(ARTIFACT_DIR, "mlruns")
 
 CAT_COLS = [
     "workclass", "education", "marital-status", "occupation",
-    "relationship", "native-country", "sex", "race",
+    "relationship", "native-country",
 ]
 NUM_COLS = ["age", "fnlwgt", "education-num", "capital-gain", "capital-loss", "hours-per-week"]
 
@@ -62,14 +65,19 @@ def train_all(X_tr: pd.DataFrame, y_tr: pd.Series, s_tr: pd.DataFrame) -> dict:
     eg = ExponentiatedGradient(base_lr, constraints=DemographicParity(), max_iter=30, nu=0.05)
     eg.fit(X_tr_tb, y_tr, sensitive_features=sensitive_col)
 
-    with mlflow.start_run(run_name="Model_A_Unmitigated"):
-        mlflow.log_param("model_type", "HistGradientBoosting")
-        mlflow.log_param("mitigated", False)
+    # Tracking is supplementary: a stale or incompatible tracking store must
+    # not prevent the actual models from being trained and saved.
+    try:
+        with mlflow.start_run(run_name="Model_A_Unmitigated"):
+            mlflow.log_param("model_type", "HistGradientBoosting")
+            mlflow.log_param("mitigated", False)
 
-    with mlflow.start_run(run_name="Model_B_FairnessMitigated"):
-        mlflow.log_param("model_type", "ExponentiatedGradient_LR")
-        mlflow.log_param("mitigated", True)
-        mlflow.log_param("constraint", "DemographicParity")
+        with mlflow.start_run(run_name="Model_B_FairnessMitigated"):
+            mlflow.log_param("model_type", "ExponentiatedGradient_LR")
+            mlflow.log_param("mitigated", True)
+            mlflow.log_param("constraint", "DemographicParity")
+    except Exception as exc:
+        print(f"MLflow tracking unavailable; continuing without run logging: {exc}")
 
     joblib.dump((model_A, prep_A), os.path.join(ARTIFACT_DIR, "model_A.joblib"))
     joblib.dump((eg, prep_B), os.path.join(ARTIFACT_DIR, "model_B.joblib"))

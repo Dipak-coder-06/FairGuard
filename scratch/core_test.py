@@ -2,8 +2,9 @@ import warnings
 warnings.filterwarnings("ignore")
 import os, sys, joblib
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
-sys.path.insert(0, r"c:\Users\dhira\Documents\Dipak_Project")
-os.chdir(r"c:\Users\dhira\Documents\Dipak_Project")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
@@ -126,7 +127,7 @@ chk("model_card.md size",
 
 # ── MODEL C — all input models ───────────────────────────────────────────────
 print("\n=== MODEL C - INPUT MODELS ===")
-input_dir = r"c:\Users\dhira\Documents\Dipak_Project\input"
+input_dir = os.path.join(ROOT, "input")
 for fname in sorted(os.listdir(input_dir)):
     if not fname.endswith(".joblib"):
         continue

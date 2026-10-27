@@ -9,23 +9,50 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = None  # disable PIL decompression bomb check
 
 
+def proxy_warning(feature_names):
+    names = [str(name).lower() for name in feature_names[:10]]
+    return any("relationship" in name or "marital-status" in name
+               or "marital_status" in name for name in names)
+
+
 def _get_shap_values(model_tuple, X_sample: pd.DataFrame):
     model, prep = model_tuple
     Xt = prep.transform(X_sample)
+    source_names = []
     try:
         feature_names = []
         for name, trans, cols in prep.transformers_:
             if name == "cat":
                 feature_names.extend(trans.get_feature_names_out(cols).tolist())
+                source_names.extend(c for c, cats in zip(cols, trans.categories_)
+                                    for _ in cats)
             else:
-                feature_names.extend(cols if isinstance(cols, list) else [cols])
+                numeric = cols if isinstance(cols, list) else [cols]
+                feature_names.extend(numeric)
+                source_names.extend(numeric)
         Xt_df = pd.DataFrame(Xt, columns=feature_names)
     except Exception:
         Xt_df = pd.DataFrame(Xt)
+        source_names = Xt_df.columns.tolist()
+
+    def collapse(vals, data, base):
+        names = list(dict.fromkeys(source_names))
+        if len(source_names) != vals.shape[1] or len(names) == vals.shape[1]:
+            return vals, data, names
+        out = np.zeros((vals.shape[0], len(names)))
+        dat = np.zeros_like(out)
+        for i, name in enumerate(names):
+            cols = [j for j, src in enumerate(source_names) if src == name]
+            out[:, i] = vals[:, cols].sum(axis=1)
+            dat[:, i] = data[:, cols].sum(axis=1)
+        return out, dat, names
 
     # Use generic shap.Explainer — works for any sklearn model
     try:
-        predict_fn = model.predict_proba
+        # Preprocessors return a NumPy matrix and the estimators are trained
+        # without column labels. SHAP supplies a DataFrame here; converting it
+        # back avoids a sklearn warning for every internal perturbation.
+        predict_fn = lambda values: model.predict_proba(np.asarray(values))
         bg = shap.maskers.Independent(Xt_df, max_samples=50)
         explainer = shap.Explainer(predict_fn, bg, feature_names=Xt_df.columns.tolist())
         sv = explainer(Xt_df, check_additivity=False)
@@ -36,25 +63,28 @@ def _get_shap_values(model_tuple, X_sample: pd.DataFrame):
         else:
             vals = sv.values
             base = sv.base_values
+        vals, data, names = collapse(vals, Xt_df.values, base)
         return shap.Explanation(
             values=vals, base_values=base,
-            data=Xt_df.values, feature_names=Xt_df.columns.tolist()
+            data=data, feature_names=names
         )
     except Exception:
         # Final fallback: predict label, use Independent masker
         try:
             bg = shap.maskers.Independent(Xt_df, max_samples=50)
-            explainer = shap.Explainer(model.predict, bg, feature_names=Xt_df.columns.tolist())
+            predict_fn = lambda values: model.predict(np.asarray(values))
+            explainer = shap.Explainer(predict_fn, bg, feature_names=Xt_df.columns.tolist())
             sv = explainer(Xt_df, check_additivity=False)
-            return sv
+            vals, data, names = collapse(sv.values, Xt_df.values, sv.base_values)
+            return shap.Explanation(values=vals, base_values=sv.base_values,
+                                    data=data, feature_names=names)
         except Exception as e:
             # Return zeros so app doesn't crash
             vals = np.zeros((len(Xt_df), len(Xt_df.columns)))
             base = np.zeros(len(Xt_df))
-            return shap.Explanation(
-                values=vals, base_values=base,
-                data=Xt_df.values, feature_names=Xt_df.columns.tolist()
-            )
+            vals, data, names = collapse(vals, Xt_df.values, base)
+            return shap.Explanation(values=vals, base_values=base,
+                                    data=data, feature_names=names)
 
 
 def global_beeswarm(model_tuple, X_sample: pd.DataFrame) -> plt.Figure:

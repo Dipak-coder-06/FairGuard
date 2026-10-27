@@ -2,8 +2,12 @@ import os
 import json
 import numpy as np
 import pandas as pd
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset
+try:  # Evidently 0.4.x
+    from evidently.report import Report
+    from evidently.metric_preset import DataDriftPreset
+except ImportError:  # Evidently 0.7.x moved these public APIs
+    from evidently import Report
+    from evidently.presets import DataDriftPreset
 
 ARTIFACT_DIR = os.path.join(os.path.dirname(__file__), "..", "artifacts")
 
@@ -18,12 +22,14 @@ def drift(ref_df: pd.DataFrame, cur_df: pd.DataFrame) -> dict:
             cur[c] = cur[c].astype(str)
 
     report = Report(metrics=[DataDriftPreset()])
-    report.run(reference_data=ref, current_data=cur)
-
+    snapshot = report.run(reference_data=ref, current_data=cur)
     html_path = os.path.join(ARTIFACT_DIR, "drift.html")
-    report.save_html(html_path)
-
-    result_dict = report.as_dict()
+    if hasattr(snapshot, "save_html"):
+        snapshot.save_html(html_path)
+        result_dict = snapshot.dict()
+    else:  # Evidently 0.4.x returns the report object from run().
+        report.save_html(html_path)
+        result_dict = report.as_dict()
     metrics_data = result_dict.get("metrics", [])
 
     share_drifted = 0.0
@@ -32,6 +38,16 @@ def drift(ref_df: pd.DataFrame, cur_df: pd.DataFrame) -> dict:
     for m in metrics_data:
         mname = m.get("metric", "")
         mresult = m.get("result", {})
+        # Evidently 0.7 stores results as named v2 metrics.
+        metric_name = m.get("metric_name", "")
+        value = m.get("value", {})
+        if "DriftedColumnsCount" in metric_name and isinstance(value, dict):
+            share_drifted = float(value.get("share", 0.0))
+        elif metric_name.startswith("ValueDrift(column="):
+            feat = metric_name.split("column=", 1)[1].split(",", 1)[0].rstrip(")")
+            score = float(value) if np.isscalar(value) else 0.0
+            per_feature[feat] = {"stattest": "value drift", "score": round(score, 4),
+                                 "drifted": bool(score < 0.05)}
         if "DatasetDriftMetric" in mname or "share_of_drifted_columns" in str(mresult):
             share_drifted = mresult.get("share_of_drifted_columns", 0.0)
         if "DataDriftTable" in mname or "drift_by_columns" in str(mresult):

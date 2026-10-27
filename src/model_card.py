@@ -100,13 +100,38 @@ def generate(metrics_A: dict, metrics_B: dict,
 |-----------|-------|
 | Share of Drifted Features | {drift.get('share_drifted', 'N/A')} |
 
+## 7. Explainability
+
+SHAP global and local explanations are available in the dashboard. Explanations describe model behaviour for individual records and feature groups; they do not describe people or groups.
+
+## 8. Privacy
+
+Privacy indicators include k-anonymity and a membership-inference proxy. These are screening measures and require review before deployment.
+
+## 9. Drift
+
+Evidently compares the training reference data with a shifted test sample. The generated drift report is retained with the artifacts.
+
+## 10. Limitations
+
+- UCI Adult data reflects 1994 US Census income patterns and may not generalise.
+- Metrics depend on the selected sample, threshold, and sensitive attribute.
+
+## 11. Ethical notes
+
+This workbench reports measured model behaviour. It must not be used as the sole basis for decisions about individuals.
+
+## 12. Approval status
+
+Approval is pending until fairness, privacy, drift, legal, and governance checks are reviewed by an assigned reviewer.
+
 ---
 
-## 7. Fairness–Accuracy Trade-off Analysis
+## Fairness–Accuracy Trade-off Analysis
 
 Model B applies the **Exponential Gradient** reduction with a **Demographic Parity** constraint, which directly optimises for equal selection rates across sensitive groups. This typically results in a measurable drop in raw accuracy and AUC compared to the unconstrained Model A, because the model is constrained away from patterns that, while predictive, correlate with protected attributes.
 
-**Why Demographic Parity and Equalized Odds can conflict:** Demographic Parity requires equal *selection rates* (P(ŷ=1 | group)), while Equalized Odds requires equal *true positive rates and false positive rates* across groups. When the *base rates* (P(y=1 | group)) differ between groups — as they do in the UCI Adult dataset across sex and race — it is **mathematically impossible** to satisfy both constraints simultaneously (Chouldechova, 2017; Kleinberg et al., 2016). Enforcing one necessarily violates the other. FairGuard AI reports both metrics to expose this tension explicitly and leave the trade-off decision to human stakeholders.
+**Why Demographic Parity and Equalized Odds can conflict:** Demographic Parity requires equal *selection rates*, while Equalized Odds requires equal *true positive rates and false positive rates*. These objectives can conflict in a classifier, so FairGuard AI reports both measured behaviours and leaves the trade-off decision to human stakeholders.
 
 ---
 

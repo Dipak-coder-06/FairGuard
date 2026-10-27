@@ -1,6 +1,7 @@
 import sys, os
-sys.path.insert(0, r"c:\Users\dhira\Documents\Dipak_Project")
-os.chdir(r"c:\Users\dhira\Documents\Dipak_Project")
+ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 
 from sklearn.model_selection import train_test_split
 from src import data_loader, models, fairness_engine, privacy_engine, drift_engine, model_card

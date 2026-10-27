@@ -36,6 +36,9 @@ def audit(y_true: pd.Series, y_pred: np.ndarray, sens_col: pd.Series) -> dict:
     )
 
     by_group = mf.by_group.copy()
+    counts = pd.Series(sf).value_counts().reindex(by_group.index).fillna(0).astype(int)
+    by_group.insert(0, "group_count", counts.values)
+    by_group.insert(1, "small_group", counts.values < 100)
     overall = mf.overall.to_dict()
 
     sr = by_group["selection_rate"]
@@ -45,7 +48,8 @@ def audit(y_true: pd.Series, y_pred: np.ndarray, sens_col: pd.Series) -> dict:
 
     tpr = by_group["TPR"]
     fpr = by_group["FPR"]
-    eod = float(abs(tpr.max() - tpr.min()) + abs(fpr.max() - fpr.min()))
+    opportunity_gap = float(tpr.max() - tpr.min())
+    eod = float(opportunity_gap + abs(fpr.max() - fpr.min()))
 
     er = by_group["error_rate"]
     dpd = float(sr.max() - sr.min())
@@ -57,6 +61,9 @@ def audit(y_true: pd.Series, y_pred: np.ndarray, sens_col: pd.Series) -> dict:
         "demographic_parity_diff": round(dpd, 4),
         "demographic_parity_ratio": round(dpr, 4),
         "equalized_odds_diff": round(eod, 4),
+        "equal_opportunity_gap": round(opportunity_gap, 4),
+        "group_counts": counts.to_dict(),
+        "small_groups": counts[counts < 100].index.astype(str).tolist(),
         "disparate_impact": round(di, 4),
         "di_flag": di < 0.8,
         "error_rate_disparity": round(float(er.max() - er.min()), 4),

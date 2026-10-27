@@ -1,7 +1,8 @@
 import os, sys
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
-sys.path.insert(0, r"c:\Users\dhira\Documents\Dipak_Project")
-os.chdir(r"c:\Users\dhira\Documents\Dipak_Project")
+ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None

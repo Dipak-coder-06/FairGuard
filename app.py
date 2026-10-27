@@ -16,7 +16,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 from src import (data_loader, models, fairness_engine,
-                 xai_engine, drift_engine, privacy_engine, model_card)
+                 xai_engine, drift_engine, privacy_engine, model_card, governance)
 
 st.set_page_config(
     page_title="FairGuard AI",
@@ -95,13 +95,13 @@ def load_and_train():
     return Xtr, Xte, ytr, yte, str_, ste, res, profile
 
 @st.cache_resource(show_spinner="Running drift & privacy…")
-def run_drift_privacy(Xtr, Xte, ste, model_A, ytr, yte):
+def run_drift_privacy(Xtr, Xte, ste, _model_A, ytr, yte):
     ref = Xtr.copy()
     cur = drift_engine.make_shifted(Xte.copy())
     dr  = drift_engine.drift(ref, cur)
     comb = pd.concat([Xte.reset_index(drop=True), ste.reset_index(drop=True)], axis=1)
     ka   = privacy_engine.k_anonymity(comb)
-    mia  = privacy_engine.mia_proxy(model_A, Xtr, ytr, Xte, yte)
+    mia  = privacy_engine.mia_proxy(_model_A, Xtr, ytr, Xte, yte)
     return dr, ka, mia
 
 Xtr, Xte, ytr, yte, str_, ste, results, profile = load_and_train()
@@ -205,12 +205,13 @@ if has_C:
 
 tabs = st.tabs(["📊 Data Explorer", "📈 Model Comparison",
                 "⚖️ Fairness Audit", "🔍 Explainability",
-                "🌊 Drift & Privacy", "📋 Governance"])
+                "🌊 Drift & Privacy", "📋 Governance", "✅ Review"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — DATA EXPLORER
 # ═══════════════════════════════════════════════════════════════════════════════
 with tabs[0]:
+    st.warning("Review measured model behaviour before making deployment decisions.")
     st.header("Dataset Profile — UCI Adult Income")
     cb  = profile["class_balance"]
     pos = cb.get(1, cb.get("1", cb.get(True, 0)))
@@ -243,6 +244,7 @@ with tabs[0]:
 # TAB 2 — MODEL COMPARISON
 # ═══════════════════════════════════════════════════════════════════════════════
 with tabs[1]:
+    st.warning("Review measured model behaviour before making deployment decisions.")
     st.header("Model Comparison — Performance vs Fairness")
     if has_C:
         st.success(f"**{results['C']['label']}** included in comparison below.")
@@ -300,6 +302,7 @@ with tabs[1]:
 # TAB 3 — FAIRNESS AUDIT
 # ═══════════════════════════════════════════════════════════════════════════════
 with tabs[2]:
+    st.warning("Review measured model behaviour before making deployment decisions.")
     st.header("Fairness Audit")
     if has_C:
         st.info(f"Model C **({results['C']['label']})** is selectable below. "
@@ -328,6 +331,7 @@ with tabs[2]:
         st.error("Disparate Impact < 0.80 — violates the Four-Fifths Rule!")
 
     st.subheader(f"Per-Group Metrics — `{fa_attr}`")
+    st.caption("Group counts and small-group flags are shown beside the metrics.")
     st.dataframe(fa["by_group"].style.format("{:.4f}"), use_container_width=True)
 
     st.subheader("Confusion Matrices by Group")
@@ -387,6 +391,7 @@ with tabs[2]:
 # TAB 4 — EXPLAINABILITY
 # ═══════════════════════════════════════════════════════════════════════════════
 with tabs[3]:
+    st.warning("Review measured model behaviour before making deployment decisions.")
     st.header("SHAP Explainability Studio")
     if has_C:
         st.info(f"Model C **({results['C']['label']})** is selectable. "
@@ -443,6 +448,10 @@ with tabs[3]:
             with st.spinner("Computing group diff…"):
                 gd = xai_engine.group_diff(tup, xai_sample, xai_sens)
             st.subheader(f"SHAP Difference by Sex ({label_key})")
+            ranked = gd.drop(columns=["diff"], errors="ignore").mean(axis=1)
+            ranked = ranked.sort_values(ascending=False).index.tolist()
+            if xai_engine.proxy_warning(ranked):
+                st.warning("Potential proxy feature detected among the top 10 model drivers; review its effect on model behaviour.")
             grad = [c for c in ["diff"] if c in gd.columns] or gd.columns.tolist()
             st.dataframe(
                 gd.style.format("{:.4f}").background_gradient(subset=grad, cmap="RdYlGn"),
@@ -468,6 +477,7 @@ with tabs[3]:
 # TAB 5 — DRIFT & PRIVACY
 # ═══════════════════════════════════════════════════════════════════════════════
 with tabs[4]:
+    st.warning("Review measured model behaviour before making deployment decisions.")
     st.header("Data Drift & Privacy Risk")
     if has_C:
         st.info(f"MIA proxy for **{results['C']['label']}** shown automatically below.")
@@ -549,6 +559,7 @@ with tabs[4]:
 # TAB 6 — GOVERNANCE
 # ═══════════════════════════════════════════════════════════════════════════════
 with tabs[5]:
+    st.warning("Review measured model behaviour before making deployment decisions.")
     st.header("Governance & Model Card")
     if has_C:
         st.info(f"Full scorecard for **{results['C']['label']}** shown below, "
@@ -664,3 +675,25 @@ with tabs[5]:
         st.success("All sign-offs complete — model cleared for deployment!")
     else:
         st.warning(f"{len(items) - done} item(s) pending.")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 7 — RESPONSIBLE AI REVIEW
+# ═══════════════════════════════════════════════════════════════════════════════
+with tabs[6]:
+    st.warning("Review measured model behaviour before making deployment decisions.")
+    st.header("Responsible AI Review")
+    review_model = st.selectbox("Review model", avail, index=default_idx(avail),
+                                format_func=mdl_label, key="review_model")
+    review_fa = fairness_engine.audit(yte, results[review_model]["preds"], ste["sex"])
+    reviewer = st.text_input("Reviewer name", key="reviewer_name")
+    reason = st.text_area("Decision reason", key="decision_reason")
+    gap = review_fa["equalized_odds_diff"]
+    st.metric("Equalized odds gap", f"{gap:.4f}")
+    approval_ok = governance.can_approve(gap, reviewer)
+    if gap > 0.1:
+        st.error("Approval is blocked because the equalized odds gap is above 0.1.")
+    approve = st.button("Approve model", disabled=not approval_ok, key="approve_model")
+    if approve:
+        governance.save_decision(mdl_label(review_model), "Approved", reviewer, reason)
+        st.success("Approval decision saved.")
+    st.caption(f"Current decision status: {governance.latest_status()}")

@@ -5,8 +5,9 @@ Run: venv\Scripts\python.exe debug_all.py
 import os, sys, warnings
 warnings.filterwarnings("ignore")
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
-sys.path.insert(0, r"c:\Users\dhira\Documents\Dipak_Project")
-os.chdir(r"c:\Users\dhira\Documents\Dipak_Project")
+ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
@@ -45,7 +46,7 @@ for name, m in trained.items():
 print(f"  Models trained: {list(results.keys())}")
 
 # Load all input models as Model C candidates
-input_dir = r"c:\Users\dhira\Documents\Dipak_Project\input"
+input_dir = os.path.join(ROOT, "input")
 input_models = {f: joblib.load(os.path.join(input_dir, f))
                 for f in sorted(os.listdir(input_dir)) if f.endswith(".joblib")}
 

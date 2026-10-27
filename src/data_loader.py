@@ -17,6 +17,8 @@ def _bin_age(age: pd.Series) -> pd.Series:
 
 
 def load(n_sample: int = 20000, random_state: int = 42):
+    if os.getenv("FAIRGUARD_SAMPLE"):
+        n_sample = min(n_sample, 1000)
     if os.path.exists(DATA_PATH):
         df = pd.read_csv(DATA_PATH)
     else:
@@ -43,7 +45,8 @@ def load(n_sample: int = 20000, random_state: int = 42):
     y = df["income"].astype(int)
     sens = df[SENSITIVE_COLS].copy()
 
-    drop_cols = ["income", "age_bin"]
+    # Sensitive columns remain available in sens for auditing only.
+    drop_cols = ["income", "age_bin", "sex", "race"]
     if "class" in df.columns:
         drop_cols.append("class")
     X = df.drop(columns=drop_cols, errors="ignore")

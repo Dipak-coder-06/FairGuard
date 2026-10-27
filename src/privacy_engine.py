@@ -21,7 +21,17 @@ def k_anonymity(df: pd.DataFrame, quasi: list = None) -> dict:
     counts = merged["count"].values
     min_k = int(counts.min())
     pct_lt5 = round(float((counts < 5).mean()) * 100, 2)
-    return {"min_k": min_k, "pct_rows_k_lt_5": pct_lt5}
+    unique_pct = round(float((counts == 1).mean()) * 100, 2)
+    return {"min_k": min_k, "pct_rows_k_lt_5": pct_lt5,
+            "unique_pct": unique_pct, "risk": privacy_risk(unique_pct)}
+
+
+def privacy_risk(unique_pct: float) -> str:
+    if unique_pct < 1:
+        return "Low"
+    if unique_pct <= 5:
+        return "Medium"
+    return "High"
 
 
 def mia_proxy(model_tuple, X_tr: pd.DataFrame, y_tr: pd.Series,
